@@ -4274,3 +4274,108 @@
         :root[data-theme="dark"] .user-avatar--header {
             border-color: rgba(30, 41, 59, 0.9);
         }
+
+        /* План vs факт */
+        .entry-kind-group {
+            margin-top: 4px;
+        }
+
+        .entry-kind-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .entry-kind-option {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            padding: 10px 12px;
+            border: 1px solid var(--gray-lighter, #e2e8f0);
+            border-radius: var(--radius-sm, 8px);
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.6);
+            transition: var(--transition-fast, 0.15s ease);
+        }
+
+        .entry-kind-option:has(input:checked) {
+            border-color: var(--primary, #6366f1);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .entry-kind-option input {
+            margin-right: 6px;
+        }
+
+        .entry-kind-option span {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .entry-kind-option small {
+            font-size: 11px;
+            color: var(--gray, #64748b);
+        }
+
+        .entry-kind-hint {
+            font-size: 12px;
+            color: var(--gray, #64748b);
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+
+        .transaction.entry-plan {
+            opacity: 0.92;
+            border: 1px dashed rgba(99, 102, 241, 0.45) !important;
+            background: rgba(99, 102, 241, 0.06) !important;
+        }
+
+        .entry-kind-mark {
+            display: inline-block;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--primary-dark, #4f46e5);
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+
+        .entry-kind-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 6px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .entry-kind-badge--plan {
+            background: rgba(99, 102, 241, 0.15);
+            color: #4338ca;
+        }
+
+        .entry-kind-badge--fact {
+            background: rgba(16, 185, 129, 0.15);
+            color: #047857;
+        }
+
+        .pdf-entry-kind {
+            font-size: 12px;
+            font-weight: 600;
+            color: #047857;
+        }
+
+        .pdf-entry-kind--fact {
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: rgba(16, 185, 129, 0.12);
+        }
+
+        :root[data-theme="dark"] .entry-kind-option {
+            background: rgba(15, 23, 42, 0.5);
+            border-color: rgba(148, 163, 184, 0.35);
+        }

@@ -637,11 +637,13 @@ class AuthUI {
         const month = now.getMonth();
         const year = now.getFullYear();
 
-        const income = transactions
+        const facts = transactions.filter((t) => t && t.entryKind !== 'plan');
+
+        const income = facts
             .filter(t => t.type === 'income')
             .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-        const expense = transactions
+        const expense = facts
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
@@ -728,12 +730,14 @@ class AuthUI {
             console.warn('updateProfileStats: не удалось прочитать операции', e);
         }
 
-        // Подсчитываем доходы и расходы
-        const income = transactions
+        const facts = transactions.filter((t) => t && t.entryKind !== 'plan');
+
+        // Подсчитываем доходы и расходы (факт)
+        const income = facts
             .filter(t => t.type === 'income')
             .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-        const expense = transactions
+        const expense = facts
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 

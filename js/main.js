@@ -154,6 +154,7 @@ function monthTotalsForComparison(transactions, month, year) {
         if (!t || !t.date) continue;
         const d = new Date(t.date);
         if (Number.isNaN(d.getTime()) || d.getMonth() !== month || d.getFullYear() !== year) continue;
+        if (t.entryKind === 'plan') continue;
         const amt = Number(t.amount) || 0;
         if (t.type === 'income') income += amt;
         else if (t.type === 'expense') expense += amt;
@@ -489,7 +490,7 @@ function updateBudgetsDisplay() {
     
     container.innerHTML = budgets.map(budget => {
         const spent = transactions
-            .filter(t => t.type === 'expense' && t.category === budget.category)
+            .filter(t => t.type === 'expense' && t.category === budget.category && t.entryKind !== 'plan')
             .reduce((sum, t) => sum + t.amount, 0);
         
         const percentage = (spent / budget.amount) * 100;

@@ -638,6 +638,22 @@
                                 <option value="Прочее" selected>Прочее</option>
                             </select>
                         </div>
+                        <div class="form-group entry-kind-group">
+                            <label class="form-label"><i class="fas fa-clipboard-list"></i> Тип записи</label>
+                            <div class="entry-kind-options">
+                                <label class="entry-kind-option">
+                                    <input type="radio" name="entryKind" value="fact" checked>
+                                    <span>Факт</span>
+                                    <small>уже произошло</small>
+                                </label>
+                                <label class="entry-kind-option">
+                                    <input type="radio" name="entryKind" value="plan">
+                                    <span>План</span>
+                                    <small>ожидаемый платёж</small>
+                                </label>
+                            </div>
+                            <p class="form-hint entry-kind-hint">План не входит в фактический баланс и графики — только отображается в календаре.</p>
+                        </div>
                         <button type="button" class="btn btn-primary" onclick="addTransaction()" style="width: 100%;">
                             <i class="fas fa-plus"></i> Добавить операцию
                         </button>
@@ -797,6 +813,13 @@
                             <option value="Образование">Образование</option>
                             <option value="Развлечения">Развлечения</option>
                             <option value="Прочее" selected>Прочее</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-clipboard-list"></i> Тип записи</label>
+                        <select class="form-control" id="quickEntryKind">
+                            <option value="fact" selected>Факт</option>
+                            <option value="plan">План</option>
                         </select>
                     </div>
                     <button type="button" class="btn btn-primary" onclick="addQuickTransaction()" style="width: 100%;">
@@ -982,12 +1005,13 @@
                                 <th>Сумма</th>
                                 <th>Тип</th>
                                 <th>Категория</th>
+                                <th>План / факт</th>
                                 <th>Описание</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody id="pdfPreviewTbody">
-                            <tr><td colspan="6" style="text-align:center; padding: 18px;">Загрузка…</td></tr>
+                            <tr><td colspan="7" style="text-align:center; padding: 18px;">Загрузка…</td></tr>
                         </tbody>
                     </table>
                 </div>

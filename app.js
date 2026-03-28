@@ -8,6 +8,11 @@
         let transactions = [];
         let recurringTemplates = [];
 
+        /** Плановые операции (entryKind === 'plan') не участвуют в фактическом балансе и графиках. */
+        function isFactEntry(t) {
+            return !!(t && t.entryKind !== 'plan');
+        }
+
         function syncTransactionManagerState() {
             if (!window.transactionManager) return;
             if (Array.isArray(transactions)) {
@@ -341,11 +346,11 @@
 
                 if (prevMonthTransactions.length > 0) {
                     let balance = 0;
-                    prevMonthTransactions.forEach(transaction => {
+                    prevMonthTransactions.filter(isFactEntry).forEach(transaction => {
                         if (transaction.type === 'income') {
-                            balance += transaction.amount;
+                            balance += Number(transaction.amount) || 0;
                         } else {
-                            balance -= transaction.amount;
+                            balance -= Number(transaction.amount) || 0;
                         }
                     });
 
@@ -427,8 +432,8 @@
                 day.className = `day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`;
                 
                 const dayTransactions = getTransactionsForDay(dayKey);
-                const dayIncome = dayTransactions.income.reduce((sum, t) => sum + t.amount, 0);
-                const dayExpense = dayTransactions.expense.reduce((sum, t) => sum + t.amount, 0);
+                const dayIncome = dayTransactions.income.filter(isFactEntry).reduce((sum, t) => sum + Number(t.amount) || 0, 0);
+                const dayExpense = dayTransactions.expense.filter(isFactEntry).reduce((sum, t) => sum + Number(t.amount) || 0, 0);
                 const dayBalance = dayIncome - dayExpense;
                 
                 // Добавляем баланс дня к накопленному остатку
@@ -460,12 +465,14 @@
                 day.innerHTML = `
                     <div class="day-number">${i}</div>
                     <div class="day-transactions">
-                        ${dayTransactions.income.map(t => 
-                            `<div class="transaction income ${t.isRecurring ? 'recurring' : ''}" title="${escapeHtml(t.description)}${t.isRecurring ? ' (Повторяющаяся)' : ''}">+${Number(t.amount || 0).toLocaleString()} ₸</div>`
-                        ).join('')}
-                        ${dayTransactions.expense.map(t => 
-                            `<div class="transaction expense ${t.isRecurring ? 'recurring' : ''}" title="${escapeHtml(t.description)}${t.isRecurring ? ' (Повторяющаяся)' : ''}">-${Number(t.amount || 0).toLocaleString()} ₸</div>`
-                        ).join('')}
+                        ${dayTransactions.income.map(t => {
+                            const plan = !isFactEntry(t);
+                            return `<div class="transaction income ${t.isRecurring ? 'recurring' : ''} ${plan ? 'entry-plan' : 'entry-fact'}" title="${escapeHtml(t.description)}${t.isRecurring ? ' (Повторяющаяся)' : ''}${plan ? ' (План)' : ' (Факт)'}">${plan ? '<span class="entry-kind-mark">П</span>' : ''}+${Number(t.amount || 0).toLocaleString()} ₸</div>`;
+                        }).join('')}
+                        ${dayTransactions.expense.map(t => {
+                            const plan = !isFactEntry(t);
+                            return `<div class="transaction expense ${t.isRecurring ? 'recurring' : ''} ${plan ? 'entry-plan' : 'entry-fact'}" title="${escapeHtml(t.description)}${t.isRecurring ? ' (Повторяющаяся)' : ''}${plan ? ' (План)' : ' (Факт)'}">${plan ? '<span class="entry-kind-mark">П</span>' : ''}-${Number(t.amount || 0).toLocaleString()} ₸</div>`;
+                        }).join('')}
                     </div>
                     ${dayIncome + dayExpense > 0 ? 
                         `<div class="day-total ${dayBalance >= 0 ? 'income' : 'expense'}">
@@ -615,7 +622,8 @@
                             description: template.description,
                             category: template.category || 'Прочее',
                             isRecurring: true,
-                            templateId: template.id
+                            templateId: template.id,
+                            entryKind: 'fact'
                         });
                     }
                     
@@ -634,17 +642,18 @@
         // Обновление статистики за месяц
         function updateMonthStats() {
             const monthTransactions = getTransactionsForMonth(currentMonth, currentYear);
-            
-            const monthIncome = monthTransactions
+            const factTx = monthTransactions.filter(isFactEntry);
+
+            const monthIncome = factTx
                 .filter(t => t.type === 'income')
-                .reduce((sum, t) => sum + t.amount, 0);
-                
-            const monthExpense = monthTransactions
+                .reduce((sum, t) => sum + Number(t.amount) || 0, 0);
+
+            const monthExpense = factTx
                 .filter(t => t.type === 'expense')
-                .reduce((sum, t) => sum + t.amount, 0);
-                
+                .reduce((sum, t) => sum + Number(t.amount) || 0, 0);
+
             const monthBalance = monthIncome - monthExpense;
-            const totalAmount = monthTransactions.reduce((sum, t) => sum + t.amount, 0);
+            const totalAmount = factTx.reduce((sum, t) => sum + Number(t.amount) || 0, 0);
 
             // Обновляем основные показатели
             document.getElementById('monthIncome').textContent = `${monthIncome.toLocaleString()} ₸`;
@@ -672,7 +681,7 @@
             // Расширенная аналитика по месяцу
             const savingsRate = monthIncome > 0 ? (monthBalance / monthIncome) * 100 : 0;
             const expenseToIncomeRatio = monthIncome > 0 ? (monthExpense / monthIncome) * 100 : 0;
-            const avgTransactionAmount = monthTransactions.length > 0 ? totalAmount / monthTransactions.length : 0;
+            const avgTransactionAmount = factTx.length > 0 ? totalAmount / factTx.length : 0;
 
             document.getElementById('savingsRate').textContent =
                 monthIncome > 0 ? `${savingsRate.toFixed(0)} %` : '—';
@@ -685,13 +694,13 @@
             const expenseByDay = {};
             const expenseByCategory = {};
 
-            monthTransactions.forEach(t => {
+            factTx.forEach(t => {
                 if (t.type === 'expense') {
                     const dateKey = t.date;
-                    expenseByDay[dateKey] = (expenseByDay[dateKey] || 0) + t.amount;
+                    expenseByDay[dateKey] = (expenseByDay[dateKey] || 0) + Number(t.amount) || 0;
 
                     const category = t.category || 'Прочее';
-                    expenseByCategory[category] = (expenseByCategory[category] || 0) + t.amount;
+                    expenseByCategory[category] = (expenseByCategory[category] || 0) + Number(t.amount) || 0;
                 }
             });
 
@@ -723,13 +732,13 @@
                     ? `${topExpenseCategory} (${topExpenseCategoryValue.toLocaleString()} ₸)`
                     : '—';
             
-            // Обновляем недельную аналитику
-            updateWeeklyStats(monthTransactions);
+            // Обновляем недельную аналитику (по факту)
+            updateWeeklyStats(factTx);
             // Обновляем аналитику по категориям
-            updateCategoryChart(monthTransactions);
-            
+            updateCategoryChart(factTx);
+
             // Проверяем на кассовый разрыв
-            checkCashGap(monthTransactions);
+            checkCashGap(factTx);
 
             if (typeof window.updateBudgetsDisplay === 'function') {
                 window.updateBudgetsDisplay();
@@ -818,16 +827,17 @@
             const cumulativeBalances = new Array(daysInMonth).fill(0);
             const labels = [];
             const initialBalance = calculatePreviousMonthBalance(currentMonth, currentYear);
-            
-            // Заполняем массив балансов по дням
-            monthTransactions.forEach(transaction => {
+
+            const facts = (monthTransactions || []).filter(isFactEntry);
+            // Заполняем массив балансов по дням (только факт)
+            facts.forEach(transaction => {
                 const transactionDate = parseDate(transaction.date);
                 const dayIndex = transactionDate.getDate() - 1;
-                
+
                 if (transaction.type === 'income') {
-                    dailyBalances[dayIndex] += transaction.amount;
+                    dailyBalances[dayIndex] += Number(transaction.amount) || 0;
                 } else {
-                    dailyBalances[dayIndex] -= transaction.amount;
+                    dailyBalances[dayIndex] -= Number(transaction.amount) || 0;
                 }
             });
             
@@ -940,6 +950,7 @@
                     const d = parseDate(t.date);
                     return d >= weekStart && d <= weekEnd;
                 });
+                const weekFacts = weekTransactions.filter(isFactEntry);
 
                 const cashFlowFull = calculateCashFlow(allMonthTransactions);
                 const startDayNum = weekStart.getDate();
@@ -952,7 +963,7 @@
                 const cumulativeBalances = new Array(daysInWeek).fill(0);
                 const labels = [];
 
-                weekTransactions.forEach(t => {
+                weekFacts.forEach(t => {
                     const d = parseDate(t.date);
                     const dayIndex = targetWeek.findIndex(day =>
                         day.getDate() === d.getDate() &&
@@ -976,7 +987,7 @@
                     labels.push(formatDisplayDate(targetWeek[i]));
                 }
 
-                const hasWeekData = weekTransactions.length > 0 ||
+                const hasWeekData = weekFacts.length > 0 ||
                     openingBalance !== 0 ||
                     dailyBalances.some(value => value !== 0);
                 drawCashFlowChart(labels, cumulativeBalances, hasWeekData);
@@ -1202,6 +1213,7 @@
                             <span class="transaction-amount ${transaction.type}">
                                 ${transaction.type === 'income' ? '+' : '-'}${Number(transaction.amount || 0).toLocaleString()} ₸
                                 ${transaction.isRecurring ? '<span class="recurring-badge">Повтор.</span>' : ''}
+                                ${transaction.entryKind === 'plan' ? '<span class="entry-kind-badge entry-kind-badge--plan">План</span>' : '<span class="entry-kind-badge entry-kind-badge--fact">Факт</span>'}
                             </span>
                             <span class="transaction-desc">
                                 ${escapeHtml(transaction.description || 'Без описания')}
@@ -1269,6 +1281,9 @@
                 return;
             }
 
+            const entryKindRadio = document.querySelector('input[name="entryKind"]:checked');
+            const entryKind = entryKindRadio && entryKindRadio.value === 'plan' ? 'plan' : 'fact';
+
             const transaction = {
                 id: Date.now().toString(),
                 type,
@@ -1276,7 +1291,8 @@
                 date,
                 description,
                 category,
-                isRecurring: false
+                isRecurring: false,
+                entryKind
             };
 
             // Используем менеджер, если доступен
@@ -1344,6 +1360,9 @@
                 return;
             }
 
+            const qk = document.getElementById('quickEntryKind');
+            const entryKind = qk && qk.value === 'plan' ? 'plan' : 'fact';
+
             const transaction = {
                 id: Date.now().toString(),
                 type,
@@ -1351,7 +1370,8 @@
                 date,
                 description,
                 category,
-                isRecurring: false
+                isRecurring: false,
+                entryKind
             };
 
             transactions.push(transaction);
@@ -1359,7 +1379,7 @@
             renderCalendar();
             updateMonthStats();
             updateCashFlowChart();
-            
+
             // Обновить содержимое модального окна
             const dateObj = parseDate(date);
             const dayNumber = dateObj.getDate();
@@ -1406,7 +1426,9 @@
             document.getElementById('editDescription').value = transaction.description || '';
             renderCategorySelect('editCategory', transaction.category || 'Прочее');
             setupCustomCategoryHandlers();
-            
+            const editEk = document.getElementById('editEntryKind');
+            if (editEk) editEk.value = transaction.entryKind === 'plan' ? 'plan' : 'fact';
+
             // Показываем модальное окно
             openModal('editTransactionModal');
         };
@@ -1463,6 +1485,13 @@
                                     <option value="Прочее" selected>Прочее</option>
                                 </select>
                             </div>
+                            <div class="form-group">
+                                <label class="form-label"><i class="fas fa-clipboard-list"></i> Тип записи</label>
+                                <select class="form-control" id="editEntryKind">
+                                    <option value="fact">Факт (совершено)</option>
+                                    <option value="plan">План (ожидается)</option>
+                                </select>
+                            </div>
                             <div class="form-actions">
                                 <button type="button" class="btn btn-primary" onclick="saveEditedTransaction()" style="width: 100%;">
                                     <i class="fas fa-save"></i> Сохранить изменения
@@ -1486,12 +1515,14 @@
             const date = document.getElementById('editDate').value;
             const description = document.getElementById('editDescription').value;
             const category = resolveCategoryValue('editCategory');
-            
+            const entryKindEl = document.getElementById('editEntryKind');
+            const entryKind = entryKindEl && entryKindEl.value === 'plan' ? 'plan' : 'fact';
+
             if (!Number.isFinite(amount) || amount <= 0 || !date || !category) {
                 alert('Заполните обязательные поля: сумма и дата');
                 return;
             }
-            
+
             const index = transactions.findIndex(t => t.id === id);
             if (index !== -1) {
                 // Используем менеджер, если доступен
@@ -1502,7 +1533,8 @@
                         amount,
                         date,
                         description,
-                        category
+                        category,
+                        entryKind
                     };
                     if (window.transactionManager.update(id, updated)) {
                         transactions = window.transactionManager.getAll();
@@ -1516,16 +1548,17 @@
                         amount,
                         date,
                         description,
-                        category
+                        category,
+                        entryKind
                     };
                 }
-                
+
                 saveToLocalStorage();
                 renderCalendar();
                 updateMonthStats();
                 updateCashFlowChart();
                 closeEditModal();
-                
+
                 // Обновляем модальное окно дня, если оно открыто
                 const dayModal = document.getElementById('dayModal');
                 if (dayModal && dayModal.style.display === 'flex') {
@@ -1635,6 +1668,8 @@
         function clearForm() {
             document.getElementById('amount').value = '';
             document.getElementById('description').value = '';
+            const factRadio = document.querySelector('input[name="entryKind"][value="fact"]');
+            if (factRadio) factRadio.checked = true;
         }
 
         // Очистка формы повторяющихся операций
@@ -1913,6 +1948,8 @@
         let pdfProcessingStartMs = 0;
         let pdfProcessingTimer = null;
         let pdfProcessingExpectedTotalMs = 45000;
+        /** Актуальные шаг/текст/% — интервал только перерисовывает ETA, не затирая шаги. */
+        let pdfProcessingUi = { step: '—', status: 'Обработка…', pct: 10 };
         const PDF_IMPORT_ETA_KEY = 'pdf_import_avg_ms';
 
         function setPdfProcessingVisible(visible) {
@@ -1925,14 +1962,16 @@
             }
         }
 
-        function updatePdfProcessing(step, status, pct) {
+        function paintPdfProcessingOverlay() {
             const statusEl = document.getElementById('pdfProcessingStatus');
             const stepEl = document.getElementById('pdfProcessingStep');
             const timeEl = document.getElementById('pdfProcessingTime');
             const fillEl = document.getElementById('pdfProcessingBarFill');
+            const { step, status, pct } = pdfProcessingUi;
             if (statusEl) statusEl.textContent = status || 'Обработка…';
             if (stepEl) stepEl.textContent = step || '—';
-            if (fillEl) fillEl.style.width = `${Math.max(5, Math.min(100, Number(pct) || 0))}%`;
+            const p = Math.max(5, Math.min(100, Number(pct) || 0));
+            if (fillEl) fillEl.style.width = `${p}%`;
 
             if (!pdfProcessingStartMs) return;
             const elapsedMs = Date.now() - pdfProcessingStartMs;
@@ -1941,6 +1980,13 @@
             const mm = Math.floor(totalSec / 60);
             const ss = String(totalSec % 60).padStart(2, '0');
             if (timeEl) timeEl.textContent = `${mm}:${ss}`;
+        }
+
+        function updatePdfProcessing(step, status, pct) {
+            if (step !== undefined && step !== null) pdfProcessingUi.step = step;
+            if (status !== undefined && status !== null) pdfProcessingUi.status = status;
+            if (pct !== undefined && pct !== null) pdfProcessingUi.pct = Number(pct) || 0;
+            paintPdfProcessingOverlay();
         }
 
         function startPdfProcessing(step, status, pct) {
@@ -1955,14 +2001,19 @@
             } catch (_e) {
                 pdfProcessingExpectedTotalMs = 45000;
             }
+            pdfProcessingUi = {
+                step: step || '—',
+                status: status || 'Обработка…',
+                pct: Number(pct) || 0
+            };
             setPdfProcessingVisible(true);
-            updatePdfProcessing(step, status, pct);
+            paintPdfProcessingOverlay();
             if (pdfProcessingTimer) clearInterval(pdfProcessingTimer);
-            pdfProcessingTimer = setInterval(() => updatePdfProcessing(step, status, pct), 1000);
+            pdfProcessingTimer = setInterval(paintPdfProcessingOverlay, 500);
         }
 
         function stopPdfProcessing() {
-            const elapsedMs = pdfProcessingStartMs ? (Date.now() - pdfProcessingStartMs) : 0;
+            const elapsedMs = pdfProcessingStartMs ? Date.now() - pdfProcessingStartMs : 0;
             if (elapsedMs > 3000 && elapsedMs < 5 * 60 * 1000) {
                 try {
                     const prev = Number(localStorage.getItem(PDF_IMPORT_ETA_KEY));
@@ -2021,7 +2072,8 @@
                 date: rawDate,
                 description,
                 category,
-                isRecurring: false
+                isRecurring: false,
+                entryKind: 'fact'
             };
         }
 
@@ -2054,7 +2106,7 @@
             summary.textContent = `Всего: ${total} • Валидных: ${validCount} • К импорту: ${validCount}`;
 
             if (!total) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 18px;">Нет операций</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 18px;">Нет операций</td></tr>';
                 return;
             }
 
@@ -2086,6 +2138,9 @@
                             <select class="pdf-preview-input" data-field="category" data-idx="${idx}">
                                 ${categoryOptions}
                             </select>
+                        </td>
+                        <td style="width: 100px; text-align: center;">
+                            <span class="pdf-entry-kind pdf-entry-kind--fact" title="Импорт из выписки">Факт</span>
                         </td>
                         <td>
                             <textarea class="pdf-preview-input" data-field="description" data-idx="${idx}">${safeDesc}</textarea>
@@ -2523,6 +2578,7 @@
                     return;
                 }
 
+                updatePdfProcessing('4/4', 'Готово', 100);
                 stopPdfProcessing();
                 openPdfPreviewModal(validated);
             } catch (error) {
