@@ -30,10 +30,10 @@ loadDotEnv();
 
 const app = express();
 
-// Google Identity Services общается с popup/iframe через postMessage. Слишком строгий COOP
-// у страницы ломает это; same-origin-allow-popups — типичная настройка для OAuth во всплывающем окне.
+// Google Identity Services / FedCM используют postMessage. Любой нестандартный COOP (или FedCM + COOP)
+// даёт предупреждение в консоли. Явно задаём unsafe-none — не изолируем opener от внешних окон OAuth.
 app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
   next();
 });
 

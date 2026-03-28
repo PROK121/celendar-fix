@@ -138,7 +138,10 @@
                 });
             },
             auto_select: false,
-            itp_support: true
+            itp_support: true,
+            // FedCM + строгие политики COOP часто дают "COOP would block postMessage" в консоли;
+            // классический поток без FedCM стабильнее на shared-хостингах (Render и т.д.).
+            use_fedcm_for_prompt: false
         });
 
         holder.innerHTML = '';
