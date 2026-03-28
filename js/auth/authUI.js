@@ -596,9 +596,30 @@ class AuthUI {
     getUserTransactions(user) {
         if (!user) return [];
 
-        if (window.StorageManager && typeof window.StorageManager.getTransactions === 'function') {
-            const items = window.StorageManager.getTransactions();
-            return Array.isArray(items) ? items : [];
+        // 1) Основной источник — TransactionManager (синхронизируется с app.js после загрузки).
+        if (window.transactionManager && typeof window.transactionManager.getAll === 'function') {
+            try {
+                const items = window.transactionManager.getAll();
+                return Array.isArray(items) ? items : [];
+            } catch (_e) {
+                /* fall through */
+            }
+        }
+
+        // 2) Кастомный слой хранения (если когда-нибудь появится), НЕ путать с встроенным
+        //    window.StorageManager из Web Storage API — у него нет getTransactions.
+        const sm = window.StorageManager;
+        if (
+            sm &&
+            typeof sm.getTransactions === 'function' &&
+            typeof sm.getRecurringTemplates === 'function'
+        ) {
+            try {
+                const items = sm.getTransactions();
+                return Array.isArray(items) ? items : [];
+            } catch (_e) {
+                return [];
+            }
         }
 
         try {
@@ -700,9 +721,12 @@ class AuthUI {
     updateProfileStats(user) {
         if (!user) return;
 
-        // Не полагаться на window.StorageManager: в браузере это встроенный API (navigator.storage),
-        // у него нет getTransactions — используем тот же путь, что и getUserTransactions().
-        const transactions = this.getUserTransactions(user);
+        let transactions = [];
+        try {
+            transactions = this.getUserTransactions(user);
+        } catch (e) {
+            console.warn('updateProfileStats: не удалось прочитать операции', e);
+        }
 
         // Подсчитываем доходы и расходы
         const income = transactions
@@ -712,7 +736,7 @@ class AuthUI {
         const expense = transactions
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-        
+
         const balance = income - expense;
 
         // Обновляем отображение
