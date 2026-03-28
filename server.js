@@ -44,8 +44,16 @@ const upload = multer({
 
 const PORT = Number(process.env.PORT || 8080);
 
-// Старые id вроде gemini-1.5-flash-latest часто недоступны в v1beta для новых ключей.
+// Старые id вроде *-latest и часть gemini-1.5-* недоступны для новых ключей / региона.
 const BLOCKED_MODEL_IDS = new Set(['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest']);
+
+// Только эти id подставляем без ListModels (если список моделей пуст). Семейство 2.x доступно чаще, чем 1.5.
+const HARDCODED_MODEL_FALLBACKS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite'
+];
 
 function filterModelId(id) {
   if (!id || typeof id !== 'string') return false;
@@ -55,7 +63,12 @@ function filterModelId(id) {
 }
 
 const _envGeminiModel = (process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim();
-const GEMINI_MODEL = BLOCKED_MODEL_IDS.has(_envGeminiModel) ? 'gemini-2.0-flash' : _envGeminiModel;
+/** gemini-1.5-pro часто отсутствует у новых ключей; -latest — в BLOCKED_MODEL_IDS. */
+const GEMINI_MODEL = BLOCKED_MODEL_IDS.has(_envGeminiModel)
+  ? 'gemini-2.0-flash'
+  : _envGeminiModel === 'gemini-1.5-pro'
+    ? 'gemini-2.0-flash'
+    : _envGeminiModel;
 const GEMINI_MODEL_FALLBACKS = (process.env.GEMINI_MODELS || '')
   .split(',')
   .map((m) => m.trim())
@@ -174,16 +187,7 @@ app.post('/api/parse-bank-pdf', upload.single('statement'), async (req, res) => 
       }
     };
 
-    const modelCandidates = [
-      GEMINI_MODEL,
-      ...GEMINI_MODEL_FALLBACKS,
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro'
-    ]
+    const modelCandidates = [GEMINI_MODEL, ...GEMINI_MODEL_FALLBACKS, ...HARDCODED_MODEL_FALLBACKS]
       .filter(filterModelId)
       .filter((v, i, arr) => v && arr.indexOf(v) === i);
 
@@ -192,7 +196,11 @@ app.post('/api/parse-bank-pdf', upload.single('statement'), async (req, res) => 
       ...modelCandidates.filter((m) => available.includes(m)),
       ...available.filter(filterModelId)
     ].filter((v, i, arr) => v && arr.indexOf(v) === i);
-    const finalCandidates = ordered.length ? ordered : modelCandidates.filter(filterModelId);
+
+    // Если ListModels вернул пусто — не вызывать gemini-1.5-*: у части ключей их нет в v1beta.
+    const finalCandidates = ordered.length
+      ? ordered
+      : modelCandidates.filter((m) => /^gemini-2\./.test(m));
 
     let data = null;
     let lastError = null;
