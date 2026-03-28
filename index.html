@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:,">
+    <title>Финансовый календарь | Управление личными финансами</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        window.GOOGLE_CLIENT_ID = '786501161600-0vrm3brlndi81dj8voes1d9e7mobeuim.apps.googleusercontent.com';
+    </script>
+    <!-- Inline скрипт для немедленной доступности toggleTheme и EmailJS -->
+    <script>
+        // Инициализация EmailJS
+        (function() {
+            window.emailjsReady = false;
+            
+            // Ждем загрузки EmailJS
+            function initEmailJS() {
+                if (typeof emailjs !== 'undefined') {
+                    try {
+                        emailjs.init('QpgNxbpMZkEvfqMRh');
+                        window.emailjsReady = true;
+                        console.log('✅ EmailJS инициализирован');
+                        console.log('📧 Service ID: bussines-celendar');
+                        console.log('📧 Template ID: template_gplvjlg');
+                    } catch (error) {
+                        console.error('❌ Ошибка инициализации EmailJS:', error);
+                        window.emailjsReady = false;
+                    }
+                } else {
+                    // Повторяем попытку через 500ms (максимум 5 раз)
+                    if (typeof initEmailJS.attempts === 'undefined') {
+                        initEmailJS.attempts = 0;
+                    }
+                    if (initEmailJS.attempts < 5) {
+                        initEmailJS.attempts++;
+                        setTimeout(initEmailJS, 500);
+                    } else {
+                        console.warn('⚠️ EmailJS не загрузился после нескольких попыток');
+                    }
+                }
+            }
+            
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initEmailJS);
+            } else {
+                initEmailJS();
+            }
+        })();
+
+        // Переключение темы - определяем СРАЗУ для доступности при клике
+        window.toggleTheme = function() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            // Применяем тему
+            document.documentElement.setAttribute('data-theme', newTheme);
+            
+            // Обновляем UI кнопки
+            const themeToggle = document.getElementById('themeToggle');
+            const themeText = document.getElementById('themeText');
+            if (themeToggle && themeText) {
+                const icon = themeToggle.querySelector('i');
+                if (newTheme === 'dark') {
+                    if (icon) icon.className = 'fas fa-sun';
+                    themeText.textContent = 'Светлая тема';
+                } else {
+                    if (icon) icon.className = 'fas fa-moon';
+                    themeText.textContent = 'Темная тема';
+                }
+            }
+            
+            // Сохраняем в localStorage
+            try {
+                const settings = JSON.parse(localStorage.getItem('settings') || '{}');
+                settings.theme = newTheme;
+                localStorage.setItem('settings', JSON.stringify(settings));
+            } catch (e) {
+                console.error('Error saving theme:', e);
+            }
+        };
+        
+        // Инициализация темы при загрузке страницы - применяем СРАЗУ
+        (function initThemeOnLoad() {
+            try {
+                const settings = JSON.parse(localStorage.getItem('settings') || '{}');
+                const theme = settings.theme || 'light';
+                // Применяем тему ДО загрузки DOM, чтобы избежать мигания
+                if (document.documentElement) {
+                    document.documentElement.setAttribute('data-theme', theme);
+                }
+                
+                // Обновляем UI кнопки после загрузки DOM
+                function updateThemeButton() {
+                    const themeToggle = document.getElementById('themeToggle');
+                    const themeText = document.getElementById('themeText');
+                    if (themeToggle && themeText) {
+                        const icon = themeToggle.querySelector('i');
+                        if (theme === 'dark') {
+                            if (icon) icon.className = 'fas fa-sun';
+                            themeText.textContent = 'Светлая тема';
+                        } else {
+                            if (icon) icon.className = 'fas fa-moon';
+                            themeText.textContent = 'Темная тема';
+                        }
+                    }
+                }
+                
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', updateThemeButton);
+                } else {
+                    // DOM уже загружен
+                    setTimeout(updateThemeButton, 0);
+                }
+            } catch (e) {
+                console.error('Error loading theme:', e);
+            }
+        })();
+    </script>
+</head>
+<body>
+    <!-- Модальное окно регистрации/входа -->
+    <div id="authModal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authDialogTitle">
+        <div class="auth-modal-content">
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">
+                    <i class="fas fa-sign-in-alt"></i> Вход
+                </button>
+                <button class="auth-tab" data-tab="register">
+                    <i class="fas fa-user-plus"></i> Регистрация
+                </button>
+            </div>
+
+            <!-- Форма входа -->
+            <div id="loginForm" class="auth-form active">
+                <h2 id="authDialogTitle">Вход в систему</h2>
+                <form id="loginFormElement">
+                    <div class="form-group">
+                        <label for="loginEmail">
+                            <i class="fas fa-envelope"></i> Email
+                        </label>
+                        <input type="email" id="loginEmail" class="form-control" required placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">
+                            <i class="fas fa-lock"></i> Пароль
+                        </label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="loginPassword" class="form-control" required placeholder="Введите пароль">
+                            <button type="button" class="password-toggle" data-target="loginPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-sign-in-alt"></i> Войти
+                    </button>
+                    <button type="button" class="btn btn-outline btn-block" id="quickLoginBtn" style="margin-top: 10px;">
+                        <i class="fas fa-bolt"></i> Войти без логина и пароля
+                    </button>
+                    <div class="oauth-divider"><span>или</span></div>
+                    <div class="oauth-buttons">
+                        <div id="googleSignInButton" class="oauth-google-host"></div>
+                        <button type="button" class="btn btn-oauth-apple btn-block" id="appleSignInBtn">
+                            <i class="fab fa-apple"></i> Войти через Apple
+                        </button>
+                    </div>
+                    <div class="auth-link">
+                        <a href="#" id="forgotPasswordLink">Забыли пароль?</a>
+                    </div>
+                </form>
+                <div id="loginError" class="error-message"></div>
+            </div>
+
+            <!-- Форма восстановления пароля -->
+            <div id="forgotPasswordForm" class="auth-form">
+                <h2>Восстановление пароля</h2>
+                <form id="forgotPasswordFormElement">
+                    <div class="form-group">
+                        <label for="forgotEmail">
+                            <i class="fas fa-envelope"></i> Email
+                        </label>
+                        <input type="email" id="forgotEmail" class="form-control" required placeholder="your@email.com">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-key"></i> Отправить код восстановления
+                    </button>
+                    <div class="auth-link">
+                        <a href="#" id="backToLoginLink">Вернуться к входу</a>
+                    </div>
+                </form>
+                <div id="forgotPasswordError" class="error-message"></div>
+                <div id="forgotPasswordSuccess" class="success-message"></div>
+            </div>
+
+            <!-- Форма сброса пароля -->
+            <div id="resetPasswordForm" class="auth-form">
+                <h2>Сброс пароля</h2>
+                <form id="resetPasswordFormElement">
+                    <div class="form-group">
+                        <label for="resetEmail">
+                            <i class="fas fa-envelope"></i> Email
+                        </label>
+                        <input type="email" id="resetEmail" class="form-control" required readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="resetCode">
+                            <i class="fas fa-shield-alt"></i> Код из письма
+                        </label>
+                        <input type="text" id="resetCode" class="form-control" required placeholder="Введите 6-значный код">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">
+                            <i class="fas fa-lock"></i> Новый пароль
+                        </label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="newPassword" class="form-control" required placeholder="Минимум 6 символов" minlength="6">
+                            <button type="button" class="password-toggle" data-target="newPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmNewPassword">
+                            <i class="fas fa-lock"></i> Подтверждение пароля
+                        </label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="confirmNewPassword" class="form-control" required placeholder="Повторите пароль">
+                            <button type="button" class="password-toggle" data-target="confirmNewPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-check"></i> Сбросить пароль
+                    </button>
+                    <div class="auth-link">
+                        <a href="#" id="backToLoginFromResetLink">Вернуться к входу</a>
+                    </div>
+                </form>
+                <div id="resetPasswordError" class="error-message"></div>
+                <div id="resetPasswordSuccess" class="success-message"></div>
+            </div>
+
+            <!-- Форма подтверждения email -->
+            <div id="verifyEmailForm" class="auth-form">
+                <h2>Подтверждение email</h2>
+                <p class="auth-info">На вашу почту отправлен код подтверждения. Введите его ниже.</p>
+                <form id="verifyEmailFormElement">
+                    <div class="form-group">
+                        <label for="verifyEmail">
+                            <i class="fas fa-envelope"></i> Email
+                        </label>
+                        <input type="email" id="verifyEmail" class="form-control" required readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="verifyCode">
+                            <i class="fas fa-shield-alt"></i> Код подтверждения
+                        </label>
+                        <input type="text" id="verifyCode" class="form-control" required placeholder="Введите 6-значный код" maxlength="6">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-check-circle"></i> Подтвердить email
+                    </button>
+                    <div class="auth-link">
+                        <a href="#" id="resendCodeLink">Отправить код повторно</a>
+                        <span id="codeDisplay" class="code-display"></span>
+                    </div>
+                </form>
+                <div id="verifyEmailError" class="error-message"></div>
+                <div id="verifyEmailSuccess" class="success-message"></div>
+            </div>
+
+            <!-- Форма регистрации -->
+            <div id="registerForm" class="auth-form">
+                <h2>Регистрация</h2>
+                <form id="registerFormElement">
+                    <div class="form-group">
+                        <label for="registerName">
+                            <i class="fas fa-user"></i> Имя
+                        </label>
+                        <input type="text" id="registerName" class="form-control" required placeholder="Ваше имя">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerEmail">
+                            <i class="fas fa-envelope"></i> Email
+                        </label>
+                        <input type="email" id="registerEmail" class="form-control" required placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">
+                            <i class="fas fa-lock"></i> Пароль
+                        </label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="registerPassword" class="form-control" required placeholder="Минимум 6 символов" minlength="6">
+                            <button type="button" class="password-toggle" data-target="registerPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPasswordConfirm">
+                            <i class="fas fa-lock"></i> Подтверждение пароля
+                        </label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="registerPasswordConfirm" class="form-control" required placeholder="Повторите пароль">
+                            <button type="button" class="password-toggle" data-target="registerPasswordConfirm">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="auth-privacy-note">
+                        Регистрируясь, вы подтверждаете ознакомление с
+                        <a href="privacy.html" target="_blank" rel="noopener noreferrer">Политикой конфиденциальности</a>
+                        и обработкой персональных данных.
+                    </p>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-user-plus"></i> Зарегистрироваться
+                    </button>
+                </form>
+                <div id="registerError" class="error-message"></div>
+            </div>
+            <div class="auth-footer-links">
+                <a href="privacy.html" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-shield-alt"></i> Политика конфиденциальности (GDPR / CCPA)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="mainContainer" style="display: none;">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>Финансовый календарь</h1>
+                    <p>Управляйте вашими доходами и расходами</p>
+                </div>
+            </div>
+            <div class="user-info" id="userInfo" style="display: none;">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-details">
+                    <div class="user-name" id="userName">Пользователь</div>
+                    <div class="user-email" id="userEmail">user@email.com</div>
+                </div>
+                <button class="btn btn-outline btn-sm" id="profileBtn" title="Информация по счету">
+                    <i class="fas fa-user-circle"></i>
+                </button>
+            </div>
+            <div class="user-actions">
+                <details class="quick-menu">
+                    <summary class="btn btn-outline" aria-label="Дополнительные действия">
+                        <i class="fas fa-bars"></i> Меню
+                    </summary>
+                    <div class="quick-menu-list">
+                        <button type="button" class="quick-menu-item" id="themeToggle" title="Переключить тему" aria-label="Переключить тему оформления">
+                            <i class="fas fa-moon"></i> <span id="themeText">Темная тема</span>
+                        </button>
+                        <button type="button" class="quick-menu-item" onclick="showFilters()">
+                            <i class="fas fa-filter"></i> Фильтры
+                        </button>
+                        <button type="button" class="quick-menu-item" onclick="exportData()">
+                            <i class="fas fa-download"></i> Экспорт
+                        </button>
+                        <button type="button" class="quick-menu-item" onclick="importData()">
+                            <i class="fas fa-upload"></i> Импорт
+                        </button>
+                        <button type="button" class="quick-menu-item" onclick="importBankStatementPdf()">
+                            <i class="fas fa-file-pdf"></i> Импорт выписки PDF
+                        </button>
+                        <button type="button" class="quick-menu-item" onclick="showRecurringTransactions()">
+                            <i class="fas fa-redo"></i> Повторяющиеся
+                        </button>
+                        <button type="button" class="quick-menu-item" onclick="showHelp()">
+                            <i class="fas fa-question-circle"></i> Помощь
+                        </button>
+                        <button type="button" class="quick-menu-item" onclick="window.open('privacy.html','_blank','noopener')">
+                            <i class="fas fa-user-shield"></i> Конфиденциальность
+                        </button>
+                        <button type="button" class="quick-menu-item danger" onclick="clearAllData()">
+                            <i class="fas fa-trash-alt"></i> Очистить все
+                        </button>
+                    </div>
+                </details>
+            </div>
+        </header>
+
+        <div class="onboarding-hint" id="onboardingHint" style="display: none;">
+            <div class="onboarding-hint-main">
+                <div class="onboarding-hint-icon">
+                    <i class="fas fa-lightbulb"></i>
+                </div>
+                <div>
+                    <div class="onboarding-hint-title">Как начать пользоваться календарём</div>
+                    <ul class="onboarding-hint-steps">
+                        <li>Выберите день в календаре ниже.</li>
+                        <li>Добавьте доход или расход через форму справа.</li>
+                        <li>Посмотрите сводку и аналитику по неделям и категориям.</li>
+                    </ul>
+                </div>
+            </div>
+            <button class="onboarding-hint-close" onclick="dismissOnboarding()">
+                Не показывать
+            </button>
+        </div>
+
+        <!-- Панель фильтров -->
+        <div class="filters-panel" id="filtersPanel" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-filter"></i> Фильтры и поиск</h3>
+                    <button class="btn btn-outline" onclick="closeFilters()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="filters-content">
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-search"></i> Поиск</label>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Поиск по описанию, категории, сумме...">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Тип операции</label>
+                            <select class="form-control" id="filterType">
+                                <option value="">Все</option>
+                                <option value="income">Доходы</option>
+                                <option value="expense">Расходы</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Категория</label>
+                            <select class="form-control" id="filterCategory">
+                                <option value="">Все категории</option>
+                                <option value="Зарплата">Зарплата</option>
+                                <option value="Питание">Питание</option>
+                                <option value="Жилье">Жилье</option>
+                                <option value="Транспорт">Транспорт</option>
+                                <option value="Коммунальные услуги">Коммунальные услуги</option>
+                                <option value="Долги и кредиты">Долги и кредиты</option>
+                                <option value="Здоровье">Здоровье</option>
+                                <option value="Образование">Образование</option>
+                                <option value="Развлечения">Развлечения</option>
+                                <option value="Прочее">Прочее</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Дата от</label>
+                            <input type="date" class="form-control" id="filterDateFrom">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Дата до</label>
+                            <input type="date" class="form-control" id="filterDateTo">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Сумма от</label>
+                            <input type="number" class="form-control" id="filterMinAmount" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Сумма до</label>
+                            <input type="number" class="form-control" id="filterMaxAmount" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" onclick="applyFilters()">
+                            <i class="fas fa-check"></i> Применить
+                        </button>
+                        <button class="btn btn-outline" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Сбросить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-chart-pie"></i> Финансовая сводка</h2>
+                    <span class="current-date">Текущий месяц: <span id="currentMonthDisplay"></span></span>
+                </div>
+                <div class="stats">
+                    <div class="stat stat-income">
+                        <div class="stat-value" id="monthIncome">0 ₸</div>
+                        <div class="stat-label">Доходы за месяц</div>
+                    </div>
+                    <div class="stat stat-expense">
+                        <div class="stat-value" id="monthExpense">0 ₸</div>
+                        <div class="stat-label">Расходы за месяц</div>
+                    </div>
+                    <div class="stat stat-balance">
+                        <div class="stat-value" id="monthBalance">0 ₸</div>
+                        <div class="stat-label">Баланс месяца</div>
+                    </div>
+                </div>
+
+                <!-- Сравнение с предыдущим месяцем -->
+                <div class="comparison-section" id="comparisonSection">
+                    <h3><i class="fas fa-chart-line"></i> Сравнение с прошлым месяцем</h3>
+                    <div class="comparison-grid">
+                        <div class="comparison-item">
+                            <span class="comparison-label">Доходы</span>
+                            <span class="comparison-value" id="comparisonIncome">—</span>
+                        </div>
+                        <div class="comparison-item">
+                            <span class="comparison-label">Расходы</span>
+                            <span class="comparison-value" id="comparisonExpense">—</span>
+                        </div>
+                        <div class="comparison-item">
+                            <span class="comparison-label">Баланс</span>
+                            <span class="comparison-value" id="comparisonBalance">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Бюджеты -->
+                <div class="budgets-section" id="budgetsSection">
+                    <div class="section-header">
+                        <h3><i class="fas fa-wallet"></i> Бюджеты на месяц</h3>
+                        <button class="btn btn-outline btn-small" onclick="showBudgetModal()">
+                            <i class="fas fa-plus"></i> Добавить бюджет
+                        </button>
+                    </div>
+                    <div id="budgetsContainer">
+                        <!-- Бюджеты будут сгенерированы JavaScript -->
+                    </div>
+                </div>
+
+                <div class="month-summary">
+                    <h3><i class="fas fa-info-circle"></i> Сводка за месяц</h3>
+                    <div class="summary-item">
+                        <span class="summary-label">Всего операций:</span>
+                        <span class="summary-value" id="monthTransactionsCount">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Средний доход в день:</span>
+                        <span class="summary-value" id="avgIncomePerDay">0 ₸</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Средний расход в день:</span>
+                        <span class="summary-value" id="avgExpensePerDay">0 ₸</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Уровень сбережений:</span>
+                        <span class="summary-value" id="savingsRate">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Доля расходов от доходов:</span>
+                        <span class="summary-value" id="expenseToIncomeRatio">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Средний размер операции:</span>
+                        <span class="summary-value" id="avgTransactionAmount">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Категория с наибольшими расходами:</span>
+                        <span class="summary-value" id="topExpenseCategory">—</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Самый затратный день:</span>
+                        <span class="summary-value" id="maxExpenseDay">—</span>
+                    </div>
+                    
+                    <div id="cashGapWarning" style="display: none;">
+                        <div class="cash-gap-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <div style="flex: 1;">
+                            <p id="cashGapMessage">Внимание! Возможен кассовый разрыв</p>
+                            </div>
+                            <button class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="focusCashGapDay()">
+                                Показать в календаре
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="card">
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('one-time')">Одиночная операция</div>
+                    <div class="tab" onclick="switchTab('recurring')">Повторяющаяся операция</div>
+                </div>
+                
+                <div id="one-time-tab" class="tab-content active">
+                    <div class="card-header">
+                        <h2 class="card-title"><i class="fas fa-plus-circle"></i> Добавить операцию</h2>
+                    </div>
+                    <form id="transactionForm">
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-exchange-alt"></i> Тип операции</label>
+                            <select class="form-control" id="type">
+                                <option value="income">Доход</option>
+                                <option value="expense">Расход</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label"><i class="fas fa-money-bill-wave"></i> Сумма</label>
+                                <input type="number" class="form-control" id="amount" placeholder="0" min="0.01" step="0.01" inputmode="decimal" required>
+                                <div class="form-error" id="amountError"></div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label"><i class="fas fa-calendar-day"></i> Дата</label>
+                                <input type="date" class="form-control" id="date">
+                                <div class="form-error" id="dateError"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-comment"></i> Описание</label>
+                            <input type="text" class="form-control" id="description" placeholder="На что потрачены или откуда получены деньги?">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-tags"></i> Категория</label>
+                            <select class="form-control" id="category">
+                                <option value="Зарплата">Зарплата</option>
+                                <option value="Питание">Питание</option>
+                                <option value="Жилье">Жилье</option>
+                                <option value="Транспорт">Транспорт</option>
+                                <option value="Коммунальные услуги">Коммунальные услуги</option>
+                                <option value="Долги и кредиты">Долги и кредиты</option>
+                                <option value="Здоровье">Здоровье</option>
+                                <option value="Образование">Образование</option>
+                                <option value="Развлечения">Развлечения</option>
+                                <option value="Прочее" selected>Прочее</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="addTransaction()" style="width: 100%;">
+                            <i class="fas fa-plus"></i> Добавить операцию
+                        </button>
+                    </form>
+                </div>
+                
+                <div id="recurring-tab" class="tab-content">
+                    <div class="card-header">
+                        <h2 class="card-title"><i class="fas fa-redo"></i> Добавить повторяющуюся операцию</h2>
+                    </div>
+                    <form id="recurringTransactionForm">
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-exchange-alt"></i> Тип операции</label>
+                            <select class="form-control" id="recurringType">
+                                <option value="income">Доход</option>
+                                <option value="expense">Расход</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label"><i class="fas fa-money-bill-wave"></i> Сумма</label>
+                                <input type="number" class="form-control" id="recurringAmount" placeholder="0" min="0.01" step="0.01" inputmode="decimal" required>
+                                <div class="form-error" id="recurringAmountError"></div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label"><i class="fas fa-history"></i> Периодичность</label>
+                                <select class="form-control" id="recurringFrequency">
+                                    <option value="weekly">Еженедельно</option>
+                                    <option value="monthly">Ежемесячно</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-calendar-day"></i> Дата начала</label>
+                            <input type="date" class="form-control" id="recurringStartDate">
+                            <div class="form-error" id="recurringStartDateError"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-comment"></i> Описание</label>
+                            <input type="text" class="form-control" id="recurringDescription" placeholder="На что потрачены или откуда получены деньги?">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-tags"></i> Категория</label>
+                            <select class="form-control" id="recurringCategory">
+                                <option value="Зарплата">Зарплата</option>
+                                <option value="Питание">Питание</option>
+                                <option value="Жилье">Жилье</option>
+                                <option value="Транспорт">Транспорт</option>
+                                <option value="Коммунальные услуги">Коммунальные услуги</option>
+                                <option value="Долги и кредиты">Долги и кредиты</option>
+                                <option value="Здоровье">Здоровье</option>
+                                <option value="Образование">Образование</option>
+                                <option value="Развлечения">Развлечения</option>
+                                <option value="Прочее" selected>Прочее</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-primary" onclick="addRecurringTransaction()" style="width: 100%;">
+                            <i class="fas fa-plus"></i> Добавить повторяющуюся операцию
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Блок расходов по категориям -->
+                <div class="category-analytics">
+                    <h3><i class="fas fa-chart-pie"></i> Расходы по категориям</h3>
+                    <canvas id="categoryChart" height="180"></canvas>
+                    <div id="categoryEmptyState" class="chart-empty-state" style="display: none;">
+                        <i class="far fa-chart-pie"></i>
+                        <p>Нет расходов за выбранный период</p>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title"><i class="fas fa-chart-line"></i> График накопленного денежного потока</h3>
+                        <div class="chart-actions">
+                            <button type="button" class="active" data-chart-view="month" onclick="changeChartView('month')">Месяц</button>
+                            <button type="button" data-chart-view="week" onclick="changeChartView('week')">Неделя</button>
+                        </div>
+                    </div>
+                    <div class="cash-flow-chart-wrap">
+                        <canvas id="cashFlowChart"></canvas>
+                    </div>
+                    <div id="cashFlowEmptyState" class="chart-empty-state" style="display: none;">
+                        <i class="far fa-chart-bar"></i>
+                        <p>Добавьте операции, чтобы увидеть динамику денежного потока</p>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+
+        <div class="calendar-section">
+            <div class="card">
+                <div class="calendar-header">
+                    <h2 class="card-title"><i class="fas fa-calendar-week"></i> Календарь операций</h2>
+                    <div class="calendar-nav">
+                        <button onclick="if (window.changeMonth) window.changeMonth(-1)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span class="current-month"><i class="fas fa-calendar"></i> <span id="currentMonth">Текущий месяц</span></span>
+                        <button onclick="if (window.changeMonth) window.changeMonth(1)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="calendar" id="calendar">
+                    <!-- Календарь будет сгенерирован JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для просмотра операций дня -->
+    <div class="modal" id="dayModal" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalDayTitle">Операции за день</h3>
+                <button class="modal-close" onclick="closeModal()" aria-label="Закрыть окно операций за день">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="transaction-list" id="modalDayTransactions">
+                    <!-- Список операций будет сгенерирован JavaScript -->
+                </div>
+                
+                <!-- Форма быстрого добавления операции -->
+                <div class="quick-add-form">
+                    <h4 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-bolt" style="color: var(--primary);"></i> Быстрое добавление операции
+                    </h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <select class="form-control" id="quickType">
+                                <option value="income">Доход</option>
+                                <option value="expense">Расход</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <input type="number" class="form-control" id="quickAmount" placeholder="Сумма" min="0.01" step="0.01" inputmode="decimal" required>
+                            <div class="form-error" id="quickAmountError"></div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="quickDescription" placeholder="Описание">
+                    </div>
+                    <div class="form-group">
+                        <select class="form-control" id="quickCategory">
+                            <option value="Зарплата">Зарплата</option>
+                            <option value="Питание">Питание</option>
+                            <option value="Жилье">Жилье</option>
+                            <option value="Транспорт">Транспорт</option>
+                            <option value="Коммунальные услуги">Коммунальные услуги</option>
+                            <option value="Долги и кредиты">Долги и кредиты</option>
+                            <option value="Здоровье">Здоровье</option>
+                            <option value="Образование">Образование</option>
+                            <option value="Развлечения">Развлечения</option>
+                            <option value="Прочее" selected>Прочее</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="addQuickTransaction()" style="width: 100%;">
+                        <i class="fas fa-plus"></i> Добавить операцию
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для управления повторяющимися операциями -->
+    <div class="modal" id="recurringModal" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Повторяющиеся операции</h3>
+                <button class="modal-close" onclick="closeRecurringModal()" aria-label="Закрыть окно повторяющихся операций">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="transaction-list" id="recurringTransactionsList">
+                    <!-- Список повторяющихся операций будет сгенерирован JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeRecurringModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для управления бюджетами -->
+    <div class="modal" id="budgetModal" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Управление бюджетами</h3>
+                <button class="modal-close" onclick="closeBudgetModal()" aria-label="Закрыть окно бюджетов">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="budgetForm">
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-tags"></i> Категория</label>
+                        <select class="form-control" id="budgetCategory" required>
+                            <option value="Питание">Питание</option>
+                            <option value="Жилье">Жилье</option>
+                            <option value="Транспорт">Транспорт</option>
+                            <option value="Коммунальные услуги">Коммунальные услуги</option>
+                            <option value="Долги и кредиты">Долги и кредиты</option>
+                            <option value="Здоровье">Здоровье</option>
+                            <option value="Образование">Образование</option>
+                            <option value="Развлечения">Развлечения</option>
+                            <option value="Прочее">Прочее</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><i class="fas fa-money-bill-wave"></i> Лимит бюджета</label>
+                        <input type="number" class="form-control" id="budgetAmount" placeholder="0" required min="1" step="0.01" inputmode="decimal">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-calendar"></i> Месяц</label>
+                            <select class="form-control" id="budgetMonth" required>
+                                <option value="0">Январь</option>
+                                <option value="1">Февраль</option>
+                                <option value="2">Март</option>
+                                <option value="3">Апрель</option>
+                                <option value="4">Май</option>
+                                <option value="5">Июнь</option>
+                                <option value="6">Июль</option>
+                                <option value="7">Август</option>
+                                <option value="8">Сентябрь</option>
+                                <option value="9">Октябрь</option>
+                                <option value="10">Ноябрь</option>
+                                <option value="11">Декабрь</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><i class="fas fa-calendar-alt"></i> Год</label>
+                            <input type="number" class="form-control" id="budgetYear" placeholder="2024" required min="2020" max="2100">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="addBudget()" style="width: 100%;">
+                        <i class="fas fa-plus"></i> Добавить бюджет
+                    </button>
+                </form>
+                <div id="budgetsList" style="margin-top: 20px;">
+                    <!-- Список существующих бюджетов -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно помощи -->
+    <div class="modal" id="helpModal" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Помощь по использованию</h3>
+                <button class="modal-close" onclick="closeHelpModal()" aria-label="Закрыть окно помощи">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <h4>Как использовать платежный календарь</h4>
+                <ul style="margin: 15px 0; padding-left: 20px;">
+                    <li style="margin-bottom: 10px;">Нажмите на любой день в календаре, чтобы просмотреть или добавить операции</li>
+                    <li style="margin-bottom: 10px;">Используйте форму добавления операции для ввода доходов и расходов</li>
+                    <li style="margin-bottom: 10px;">В модальном окне дня можно быстро добавить операцию без закрытия окна</li>
+                    <li style="margin-bottom: 10px;">Создавайте повторяющиеся операции для регулярных платежей</li>
+                    <li style="margin-bottom: 10px;">Экспортируйте данные для резервного копирования или переноса на другой компьютер</li>
+                    <li style="margin-bottom: 10px;">Импортируйте данные для восстановления из резервной копии</li>
+                </ul>
+                
+                <h4>Финансовая аналитика</h4>
+                <ul style="margin: 15px 0; padding-left: 20px;">
+                    <li style="margin-bottom: 10px;">Сводка за месяц показывает финансовые показатели только за текущий месяц</li>
+                    <li style="margin-bottom: 10px;">Аналитика по неделям позволяет отслеживать динамику доходов и расходов</li>
+                    <li style="margin-bottom: 10px;">Средние показатели в день помогают планировать ежедневный бюджет</li>
+                    <li style="margin-bottom: 10px;">График денежного потока показывает накопленный баланс по дням</li>
+                    <li style="margin-bottom: 10px;">Отрицательный баланс на графике выделяется красным цветом</li>
+                    <li style="margin-bottom: 10px;">Система автоматически определяет возможные кассовые разрывы</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeHelpModal()">Понятно</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Скрытый input для импорта данных -->
+    <input type="file" id="importFile" accept=".json" style="display: none">
+    <input type="file" id="bankStatementFile" accept=".pdf,application/pdf" style="display: none">
+
+    <!-- Уведомление -->
+    <div class="notification" id="notification" role="status" aria-live="polite">
+        <i class="fas fa-check-circle"></i>
+        <span>Операция успешно добавлена!</span>
+    </div>
+
+    <div class="processing-overlay" id="pdfProcessingOverlay" style="display:none" role="status" aria-live="polite" aria-label="Обработка PDF">
+        <div class="processing-card">
+            <div class="processing-title">
+                <i class="fas fa-file-invoice"></i>
+                <span>Обработка выписки</span>
+            </div>
+            <div class="processing-status" id="pdfProcessingStatus">Подготовка…</div>
+            <div class="processing-meta">
+                <span>Осталось: <strong id="pdfProcessingTime">0:00</strong></span>
+                <span>Шаг: <strong id="pdfProcessingStep">—</strong></span>
+            </div>
+            <div class="processing-bar" aria-hidden="true">
+                <div class="processing-bar-fill" id="pdfProcessingBarFill" style="width: 10%"></div>
+            </div>
+            <div class="processing-hint">Не закрывайте страницу до завершения.</div>
+        </div>
+    </div>
+
+    <div class="modal" id="pdfPreviewModal" role="dialog" aria-modal="true" aria-labelledby="pdfPreviewTitle">
+        <div class="modal-content" style="max-width: 980px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="pdfPreviewTitle"><i class="fas fa-list-check"></i> Предпросмотр импорта</h3>
+                <button class="modal-close" onclick="if(window.closePdfPreview) window.closePdfPreview()" aria-label="Закрыть предпросмотр">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="pdf-preview-top">
+                    <div class="pdf-preview-summary" id="pdfPreviewSummary">—</div>
+                    <div class="pdf-preview-actions">
+                        <button type="button" class="btn btn-outline btn-sm" onclick="if(window.removePdfPreviewInvalid) window.removePdfPreviewInvalid()">
+                            Удалить невалидные
+                        </button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="if(window.resetPdfPreview) window.resetPdfPreview()">
+                            Сбросить правки
+                        </button>
+                    </div>
+                </div>
+                <div class="pdf-preview-table-wrap">
+                    <table class="pdf-preview-table" id="pdfPreviewTable">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Сумма</th>
+                                <th>Тип</th>
+                                <th>Категория</th>
+                                <th>Описание</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="pdfPreviewTbody">
+                            <tr><td colspan="6" style="text-align:center; padding: 18px;">Загрузка…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <button type="button" class="btn btn-outline" onclick="if(window.closePdfPreview) window.closePdfPreview()">
+                    Отмена
+                </button>
+                <button type="button" class="btn btn-primary" onclick="if(window.confirmPdfPreviewImport) window.confirmPdfPreviewImport()">
+                    Импортировать
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключение скриптов (без модулей для работы с file://) -->
+    <!-- Порядок загрузки важен! -->
+    
+    <!-- 1. Аутентификация и OAuth -->
+    <script src="js/auth/auth.js"></script>
+    <script src="js/auth/oauthProviders.js"></script>
+    <script src="js/cloud/cloudSync.js"></script>
+    <script src="js/auth/authUI.js"></script>
+    <!-- 2. Дополнительные UI-утилиты -->
+    <script src="js/main.js"></script>
+    
+    <!-- 3. Основной runtime -->
+    <script src="app.js"></script>
+    
+    <!-- Тест EmailJS -->
+    <script>
+        // Проверка EmailJS после загрузки
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (typeof emailjs !== 'undefined' && window.emailjsReady) {
+                    console.log('✅ EmailJS подключен и готов к работе');
+                    console.log('📧 Service ID: bussines-celendar');
+                    console.log('📧 Template ID: template_gplvjlg');
+                    console.log('💡 Для теста используйте: testEmailJS("your@email.com")');
+            } else {
+                    console.warn('⚠️ EmailJS не загружен или не инициализирован');
+                }
+            }, 1000);
+        });
+    </script>
+
+    <!-- Модальное окно личного кабинета -->
+    <div id="profileModal" class="modal" style="display: none;" role="dialog" aria-modal="true">
+        <div class="modal-content profile-modal-content">
+            <div class="profile-header">
+                <h2><i class="fas fa-user-circle"></i> Личный кабинет</h2>
+                <button class="modal-close" onclick="if(window.authUI) window.authUI.closeProfileModal()" aria-label="Закрыть личный кабинет">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="profile-body">
+                <!-- Информация о пользователе -->
+                <div class="profile-section">
+                    <div class="profile-avatar-large">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="profile-info">
+                        <h3 id="profileName">Имя пользователя</h3>
+                        <p id="profileEmail">email@example.com</p>
+                        <p id="profileDate" class="profile-date">Дата регистрации: -</p>
+                        <div id="profileStatus" class="status-badge">Статус</div>
+                    </div>
+                </div>
+
+                <!-- Краткая статистика -->
+                <div class="profile-stats">
+                    <h4><i class="fas fa-chart-line"></i> Краткая статистика</h4>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon income">
+                                <i class="fas fa-arrow-up"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Доходы</div>
+                                <div class="stat-value" id="profileIncome">0 ₸</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon expense">
+                                <i class="fas fa-arrow-down"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Расходы</div>
+                                <div class="stat-value" id="profileExpense">0 ₸</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon balance">
+                                <i class="fas fa-wallet"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Баланс</div>
+                                <div class="stat-value" id="profileBalance">0 ₸</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon transactions">
+                                <i class="fas fa-list"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Операций</div>
+                                <div class="stat-value" id="profileTransactionsCount">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Облачная синхронизация -->
+                <div class="profile-section">
+                    <h4><i class="fas fa-cloud"></i> Облачное хранение</h4>
+                    <p class="profile-info-text" style="padding: 0 0 12px;">
+                        Синхронизация с вашим сервером (опционально). Настройте <code>window.CLOUD_SYNC</code> и API — см. <code>README.md</code> и файл <code>js/cloud/cloudSync.js</code>.
+                    </p>
+                    <div class="profile-cloud-actions">
+                        <button type="button" class="btn btn-outline btn-block" onclick="if(window.cloudSync) window.cloudSync.push()">
+                            <i class="fas fa-cloud-upload-alt"></i> Отправить данные в облако
+                        </button>
+                        <button type="button" class="btn btn-outline btn-block" style="margin-top: 8px;" onclick="if(window.cloudSync) window.cloudSync.pull()">
+                            <i class="fas fa-cloud-download-alt"></i> Загрузить из облака
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Переключение пользователей -->
+                <div class="profile-section">
+                    <h4><i class="fas fa-users"></i> Переключение пользователей</h4>
+                    <div class="users-list" id="usersList">
+                        <p class="profile-info-text">Загрузка пользователей...</p>
+                    </div>
+                </div>
+
+                <div class="profile-section" id="adminPanel" style="display: none;">
+                    <h4><i class="fas fa-user-shield"></i> Админ-панель</h4>
+                    <div class="admin-users-list" id="adminUsersList">
+                        <p class="profile-info-text">Загрузка пользователей...</p>
+                    </div>
+                </div>
+
+                <!-- Действия -->
+                <div class="profile-actions">
+                    <button class="btn btn-primary btn-block" onclick="if(window.authUI) window.authUI.handleLogout()">
+                        <i class="fas fa-sign-out-alt"></i> Выйти из аккаунта
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="accountPopupModal" class="modal" style="display: none;" role="dialog" aria-modal="true">
+        <div class="modal-content account-popup-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-wallet"></i> Информация по счету</h3>
+                <button class="modal-close" onclick="if(window.authUI) window.authUI.closeAccountPopup()" aria-label="Закрыть информацию по счету">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body account-popup-body">
+                <div class="account-popup-user">
+                    <div class="account-popup-name" id="accountPopupName">Пользователь</div>
+                    <div class="account-popup-email" id="accountPopupEmail">user@email.com</div>
+                    <div class="status-badge" id="accountPopupStatus">Статус</div>
+                </div>
+
+                <div class="account-popup-balance">
+                    <div class="account-popup-balance-label">Текущий баланс</div>
+                    <div class="account-popup-balance-value" id="accountPopupBalance">0 ₸</div>
+                </div>
+
+                <div class="account-popup-grid">
+                    <div class="account-popup-item income">
+                        <span>Доходы</span>
+                        <strong id="accountPopupIncome">0 ₸</strong>
+                    </div>
+                    <div class="account-popup-item expense">
+                        <span>Расходы</span>
+                        <strong id="accountPopupExpense">0 ₸</strong>
+                    </div>
+                    <div class="account-popup-item">
+                        <span>Операций всего</span>
+                        <strong id="accountPopupTransactions">0</strong>
+                    </div>
+                    <div class="account-popup-item">
+                        <span>Операций за месяц</span>
+                        <strong id="accountPopupMonthTransactions">0</strong>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-primary btn-block" onclick="if(window.authUI) window.authUI.handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i> Выйти из аккаунта
+                </button>
+                <button type="button" class="btn btn-outline btn-block" id="openAdminPanelBtn" style="display: none;" onclick="if(window.authUI){ window.authUI.openAdminPanel(); }">
+                    <i class="fas fa-user-shield"></i> Открыть админ-панель
+                </button>
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>
