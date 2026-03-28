@@ -988,9 +988,27 @@ class AuthUI {
             const userNameEl = document.getElementById('userName');
             const userEmailEl = document.getElementById('userEmail');
             const userInfoEl = document.getElementById('userInfo');
+            const avatarEl = document.getElementById('userAvatar');
             if (userNameEl) userNameEl.textContent = user.name;
             if (userEmailEl) userEmailEl.textContent = user.email || '-';
             if (userInfoEl) userInfoEl.style.display = 'flex';
+            if (avatarEl) {
+                const raw = String(user.name || user.email || '?').trim();
+                const parts = raw.split(/\s+/).filter(Boolean);
+                let initials = '?';
+                if (parts.length >= 2) {
+                    initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                } else if (parts.length === 1) {
+                    const p = parts[0];
+                    if (p.includes('@')) {
+                        initials = p[0].toUpperCase();
+                    } else {
+                        initials = p.length >= 2 ? p.slice(0, 2).toUpperCase() : p.toUpperCase();
+                    }
+                }
+                avatarEl.textContent = initials;
+                avatarEl.title = user.name || user.email || '';
+            }
         }
     }
 

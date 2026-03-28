@@ -145,10 +145,21 @@
         });
 
         holder.innerHTML = '';
+        var btnWidth = holder.offsetWidth;
+        if (!btnWidth || btnWidth < 200) {
+            var formEl = document.getElementById('loginFormElement');
+            if (formEl) {
+                btnWidth = formEl.getBoundingClientRect().width;
+            }
+        }
+        if (!btnWidth || btnWidth < 200) {
+            btnWidth = 320;
+        }
+        btnWidth = Math.max(260, Math.min(420, Math.floor(btnWidth)));
         google.accounts.id.renderButton(holder, {
             theme: 'outline',
             size: 'large',
-            width: 280,
+            width: btnWidth,
             text: 'signin_with',
             locale: 'ru'
         });

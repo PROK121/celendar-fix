@@ -346,16 +346,15 @@
                     <p>Управляйте вашими доходами и расходами</p>
                 </div>
             </div>
-            <div class="user-info" id="userInfo" style="display: none;">
-                <div class="user-avatar">
-                    <i class="fas fa-user"></i>
-                </div>
+            <div class="user-info user-info--toolbar" id="userInfo" style="display: none;">
+                <div class="user-avatar user-avatar--header" id="userAvatar" title="">?</div>
                 <div class="user-details">
                     <div class="user-name" id="userName">Пользователь</div>
                     <div class="user-email" id="userEmail">user@email.com</div>
                 </div>
-                <button class="btn btn-outline btn-sm" id="profileBtn" title="Информация по счету">
-                    <i class="fas fa-user-circle"></i>
+                <button type="button" class="btn btn-outline btn-sm user-profile-open-btn" id="profileBtn" title="Личный кабинет">
+                    <i class="fas fa-user-circle" aria-hidden="true"></i>
+                    <span class="user-profile-open-label">Кабинет</span>
                 </button>
             </div>
             <div class="user-actions">

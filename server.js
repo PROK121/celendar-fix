@@ -47,13 +47,47 @@ const PORT = Number(process.env.PORT || 8080);
 // Старые id вроде *-latest и часть gemini-1.5-* недоступны для новых ключей / региона.
 const BLOCKED_MODEL_IDS = new Set(['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest']);
 
-// Только эти id подставляем без ListModels (если список моделей пуст). Семейство 2.x доступно чаще, чем 1.5.
+// Без ListModels: сначала не-lite (у *-lite отдельные/жёсткие free-tier лимиты), потом lite.
 const HARDCODED_MODEL_FALLBACKS = [
   'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
   'gemini-2.0-flash',
+  'gemini-2.5-flash-lite',
   'gemini-2.0-flash-lite'
 ];
+
+function isGeminiQuotaError(text) {
+  const t = String(text || '').toLowerCase();
+  return (
+    t.includes('quota') ||
+    t.includes('exceeded your current quota') ||
+    t.includes('resource exhausted') ||
+    t.includes('rate limit') ||
+    t.includes('too many requests')
+  );
+}
+
+/** Стабильный порядок: полные модели раньше *-lite. */
+function deprioritizeLiteModels(ids) {
+  const list = Array.isArray(ids) ? ids : [];
+  const nonLite = list.filter((m) => typeof m === 'string' && m && !/-lite$/i.test(m));
+  const lite = list.filter((m) => typeof m === 'string' && m && /-lite$/i.test(m));
+  return [...nonLite, ...lite];
+}
+
+function userFacingGeminiFailureMessage(lastError) {
+  if (!lastError) return 'Не удалось вызвать Gemini с доступными моделями.';
+  if (isGeminiQuotaError(lastError)) {
+    const retryMatch = String(lastError).match(/retry in ([\d.]+)\s*s/i);
+    const sec = retryMatch ? Math.ceil(parseFloat(retryMatch[1], 10)) : null;
+    let msg =
+      'Превышена квота бесплатного доступа Gemini или лимит запросов на минуту. Подождите и повторите импорт';
+    if (sec && sec > 0 && sec < 7200) msg += ` (рекомендуется не раньше чем через ~${sec} с)`;
+    msg +=
+      '. Проверьте лимиты: https://ai.dev/rate-limit и при необходимости тариф в Google AI Studio.';
+    return msg;
+  }
+  return String(lastError);
+}
 
 function filterModelId(id) {
   if (!id || typeof id !== 'string') return false;
@@ -198,9 +232,10 @@ app.post('/api/parse-bank-pdf', upload.single('statement'), async (req, res) => 
     ].filter((v, i, arr) => v && arr.indexOf(v) === i);
 
     // Если ListModels вернул пусто — не вызывать gemini-1.5-*: у части ключей их нет в v1beta.
-    const finalCandidates = ordered.length
+    const rawFinal = ordered.length
       ? ordered
       : modelCandidates.filter((m) => /^gemini-2\./.test(m));
+    const finalCandidates = deprioritizeLiteModels(rawFinal).filter((v, i, arr) => v && arr.indexOf(v) === i);
 
     let data = null;
     let lastError = null;
@@ -222,9 +257,17 @@ app.post('/api/parse-bank-pdf', upload.single('statement'), async (req, res) => 
     }
 
     if (!data) {
-      return res.status(502).json({
+      const friendly = userFacingGeminiFailureMessage(lastError);
+      const status = isGeminiQuotaError(lastError) ? 429 : 502;
+      const retryMatch = lastError && String(lastError).match(/retry in ([\d.]+)\s*s/i);
+      const retrySec = retryMatch ? Math.ceil(parseFloat(retryMatch[1], 10)) : null;
+      if (retrySec && retrySec > 0 && retrySec < 7200) {
+        res.setHeader('Retry-After', String(Math.min(retrySec, 120)));
+      }
+      return res.status(status).json({
         success: false,
-        message: lastError || 'Не удалось вызвать Gemini с доступными моделями'
+        message: friendly,
+        details: lastError || undefined
       });
     }
 
