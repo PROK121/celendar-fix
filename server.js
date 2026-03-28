@@ -29,6 +29,14 @@ function loadDotEnv() {
 loadDotEnv();
 
 const app = express();
+
+// Google Identity Services общается с popup/iframe через postMessage. Слишком строгий COOP
+// у страницы ломает это; same-origin-allow-popups — типичная настройка для OAuth во всплывающем окне.
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }

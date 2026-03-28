@@ -698,19 +698,20 @@ class AuthUI {
 
     // Обновление статистики в профиле
     updateProfileStats(user) {
-        if (!window.StorageManager) return;
+        if (!user) return;
 
-        const transactions = window.StorageManager.getTransactions() || [];
-        const templates = window.StorageManager.getRecurringTemplates() || [];
-        
+        // Не полагаться на window.StorageManager: в браузере это встроенный API (navigator.storage),
+        // у него нет getTransactions — используем тот же путь, что и getUserTransactions().
+        const transactions = this.getUserTransactions(user);
+
         // Подсчитываем доходы и расходы
         const income = transactions
             .filter(t => t.type === 'income')
-            .reduce((sum, t) => sum + (t.amount || 0), 0);
-        
+            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
         const expense = transactions
             .filter(t => t.type === 'expense')
-            .reduce((sum, t) => sum + (t.amount || 0), 0);
+            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
         
         const balance = income - expense;
 
