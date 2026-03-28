@@ -80,7 +80,15 @@ window.CLOUD_SYNC = {
 Опционально:
 
 - `PORT` — порт сервера (по умолчанию `8080`)
-- `GEMINI_MODEL` — модель Gemini (по умолчанию `gemini-1.5-flash`)
+- `GEMINI_MODEL` — модель Gemini (см. значение по умолчанию в `server.js`)
+
+### Render и другой хостинг
+
+Файл `.env` в репозиторий обычно **не** кладут: ключ задаётся в панели хостинга.
+
+**Render:** откройте ваш **Web Service** → **Environment** → **Add Environment Variable** → имя `GEMINI_API_KEY`, значение — ключ из [Google AI Studio](https://aistudio.google.com/apikey). Сохраните и **вручную задеплойте** или дождитесь перезапуска, чтобы переменная попала в процесс `node server.js`.
+
+Если ошибка «`GEMINI_API_KEY не задан на сервере`» остаётся, проверьте, что сервис запускается командой вроде `npm start` (корень репозитория с `server.js`), а не только статическая раздача `index.html` без Node.
 
 ### В UI
 

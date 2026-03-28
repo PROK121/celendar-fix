@@ -43,11 +43,23 @@ const upload = multer({
 });
 
 const PORT = Number(process.env.PORT || 8080);
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
+// Старые id вроде gemini-1.5-flash-latest часто недоступны в v1beta для новых ключей.
+const BLOCKED_MODEL_IDS = new Set(['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest']);
+
+function filterModelId(id) {
+  if (!id || typeof id !== 'string') return false;
+  const m = id.trim();
+  if (BLOCKED_MODEL_IDS.has(m)) return false;
+  return true;
+}
+
+const _envGeminiModel = (process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim();
+const GEMINI_MODEL = BLOCKED_MODEL_IDS.has(_envGeminiModel) ? 'gemini-2.0-flash' : _envGeminiModel;
 const GEMINI_MODEL_FALLBACKS = (process.env.GEMINI_MODELS || '')
   .split(',')
   .map((m) => m.trim())
-  .filter(Boolean);
+  .filter(filterModelId);
 
 app.use(express.static(process.cwd()));
 
@@ -100,14 +112,18 @@ async function listGeminiModels(apiKey) {
   return models
     .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
     .map((m) => String(m.name || '').replace(/^models\//, ''))
-    .filter(Boolean);
+    .filter(filterModelId);
 }
 
 app.post('/api/parse-bank-pdf', upload.single('statement'), async (req, res) => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ success: false, message: 'GEMINI_API_KEY не задан на сервере' });
+      return res.status(500).json({
+        success: false,
+        message:
+          'GEMINI_API_KEY не задан на сервере. Добавьте ключ в переменные окружения (Render: Dashboard → Environment → GEMINI_API_KEY), затем перезапустите сервис. Локально: файл .env или команда GEMINI_API_KEY=... npm start'
+      });
     }
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({ success: false, message: 'PDF файл не передан' });
@@ -161,17 +177,22 @@ app.post('/api/parse-bank-pdf', upload.single('statement'), async (req, res) => 
     const modelCandidates = [
       GEMINI_MODEL,
       ...GEMINI_MODEL_FALLBACKS,
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
       'gemini-2.0-flash',
       'gemini-2.0-flash-lite',
-      'gemini-1.5-flash-latest'
-    ].filter((v, i, arr) => v && arr.indexOf(v) === i);
+      'gemini-1.5-flash',
+      'gemini-1.5-pro'
+    ]
+      .filter(filterModelId)
+      .filter((v, i, arr) => v && arr.indexOf(v) === i);
 
     const available = await listGeminiModels(apiKey);
     const ordered = [
       ...modelCandidates.filter((m) => available.includes(m)),
-      ...available
+      ...available.filter(filterModelId)
     ].filter((v, i, arr) => v && arr.indexOf(v) === i);
-    const finalCandidates = ordered.length ? ordered : modelCandidates;
+    const finalCandidates = ordered.length ? ordered : modelCandidates.filter(filterModelId);
 
     let data = null;
     let lastError = null;
@@ -221,10 +242,13 @@ app.listen(PORT, () => {
   const hasEnv = fs.existsSync(path.join(process.cwd(), '.env'));
   console.log(`[server] started on http://localhost:${PORT}`);
   if (!process.env.GEMINI_API_KEY) {
-    console.log('[server] GEMINI_API_KEY is not set');
+    console.warn(
+      '[server] GEMINI_API_KEY is not set — PDF import (/api/parse-bank-pdf) will fail. ' +
+        'Set it in process env (e.g. Render → Environment) or in .env for local dev.'
+    );
   }
-  if (!hasEnv) {
-    console.log('[server] Tip: create .env with GEMINI_API_KEY=...');
+  if (!hasEnv && !process.env.GEMINI_API_KEY) {
+    console.log('[server] Tip: locally create .env with GEMINI_API_KEY=your_key');
   }
   console.log(`[server] GEMINI_MODEL=${GEMINI_MODEL}`);
 });
